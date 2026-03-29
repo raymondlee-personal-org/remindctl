@@ -155,6 +155,7 @@ enum AddCommand {
           }
         } catch {
           // Assignment write failed — the @Name: prefix in the title is still there as fallback
+          FileHandle.standardError.write("⚠️ SQLite assignment write failed: \(error)\n".data(using: .utf8)!)
         }
       }
 

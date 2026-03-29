@@ -383,7 +383,8 @@ public final class RemindersSQLiteStore: @unchecked Sendable {
     let now = Self.coreDataTimestamp(from: Date())
 
     // Get the next Z_PK from Z_PRIMARYKEY table
-    let nextPK = try nextPrimaryKey(db: db, entityID: 21)
+    // Use base entity (13=REMCDObject) for shared PK counter — all subtypes share ZREMCDOBJECT table
+    let nextPK = try nextPrimaryKey(db: db, entityID: 13)
 
     let sql = """
       INSERT INTO ZREMCDOBJECT (
@@ -413,7 +414,7 @@ public final class RemindersSQLiteStore: @unchecked Sendable {
     }
 
     // Update the Z_PRIMARYKEY counter
-    try updatePrimaryKeyCounter(db: db, entityID: 21, newMax: nextPK)
+    try updatePrimaryKeyCounter(db: db, entityID: 13, newMax: nextPK)
 
     // Also mark the reminder itself as dirty so CloudKit syncs
     try markReminderDirty(db: db, reminderPK: reminderPK)
