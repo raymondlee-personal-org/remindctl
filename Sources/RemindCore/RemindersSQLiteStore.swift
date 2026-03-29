@@ -386,13 +386,23 @@ public final class RemindersSQLiteStore: @unchecked Sendable {
     // Use base entity (13=REMCDObject) for shared PK counter — all subtypes share ZREMCDOBJECT table
     let nextPK = try nextPrimaryKey(db: db, entityID: 13)
 
+    // Get zone owner and originator from existing sharee data
+    let zoneOwner = try zoneOwnerName(db: db)
+    let reminderIdentifier = try reminderBinaryIdentifier(db: db, reminderPK: reminderPK)
+    let assignmentUUID = UUID()
+    let assignmentIdentifier = assignmentUUID.uuidData
+
     let sql = """
       INSERT INTO ZREMCDOBJECT (
         Z_PK, Z_ENT, Z_OPT, ZACCOUNT,
-        ZASSIGNEE, ZREMINDER1,
-        ZCKASSIGNEEIDENTIFIER, ZASSIGNEDDATE,
-        ZCKDIRTYFLAGS
-      ) VALUES (?, 21, 1, 1, ?, ?, ?, ?, 1)
+        ZASSIGNEE, ZORIGINATOR, ZREMINDER1,
+        ZCKASSIGNEEIDENTIFIER, ZCKORIGINATORIDENTIFIER,
+        ZASSIGNEDDATE, ZCKDIRTYFLAGS,
+        ZSTATUS,
+        ZEFFECTIVEMINIMUMSUPPORTEDAPPVERSION, ZMARKEDFORDELETION, ZMINIMUMSUPPORTEDAPPVERSION,
+        ZCKZONEOWNERNAME,
+        ZIDENTIFIER, ZOWNINGREMINDERIDENTIFIER
+      ) VALUES (?, 21, 1, 1, ?, ?, ?, ?, ?, ?, 1, 1, 0, 0, 0, ?, ?, ?)
       """
 
     var stmt: OpaquePointer?
@@ -403,10 +413,22 @@ public final class RemindersSQLiteStore: @unchecked Sendable {
     defer { sqlite3_finalize(stmt) }
 
     sqlite3_bind_int64(stmt, 1, nextPK)
-    sqlite3_bind_int64(stmt, 2, shareePK)
-    sqlite3_bind_int64(stmt, 3, reminderPK)
-    sqlite3_bind_text(stmt, 4, (shareeCKIdentifier as NSString).utf8String, -1, nil)
-    sqlite3_bind_double(stmt, 5, now)
+    sqlite3_bind_int64(stmt, 2, shareePK)      // ZASSIGNEE
+    sqlite3_bind_int64(stmt, 3, shareePK)      // ZORIGINATOR (same as assignee for self-assign)
+    sqlite3_bind_int64(stmt, 4, reminderPK)    // ZREMINDER1
+    sqlite3_bind_text(stmt, 5, (shareeCKIdentifier as NSString).utf8String, -1, nil) // ZCKASSIGNEEIDENTIFIER
+    sqlite3_bind_text(stmt, 6, (shareeCKIdentifier as NSString).utf8String, -1, nil) // ZCKORIGINATORIDENTIFIER
+    sqlite3_bind_double(stmt, 7, now)          // ZASSIGNEDDATE
+    // 8 = ZCKDIRTYFLAGS (already 1 in SQL)
+    // 9 = ZSTATUS (already 1 in SQL)
+    // 10-12 = 0, 0, 0 in SQL
+    sqlite3_bind_text(stmt, 8, (zoneOwner as NSString).utf8String, -1, nil) // ZCKZONEOWNERNAME
+    assignmentIdentifier.withUnsafeBytes { ptr in
+      sqlite3_bind_blob(stmt, 9, ptr.baseAddress, Int32(ptr.count), nil) // ZIDENTIFIER
+    }
+    reminderIdentifier.withUnsafeBytes { ptr in
+      sqlite3_bind_blob(stmt, 10, ptr.baseAddress, Int32(ptr.count), nil) // ZOWNINGREMINDERIDENTIFIER
+    }
 
     guard sqlite3_step(stmt) == SQLITE_DONE else {
       throw RemindCoreError.operationFailed(
@@ -552,5 +574,48 @@ public final class RemindersSQLiteStore: @unchecked Sendable {
     process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
     process.arguments = ["-a", "Reminders"]
     try? process.run()
+  }
+
+  // MARK: - Helpers for assignment write
+
+  private func zoneOwnerName(db: OpaquePointer) throws -> String {
+    let sql = "SELECT ZCKZONEOWNERNAME FROM ZREMCDOBJECT WHERE ZCKZONEOWNERNAME IS NOT NULL LIMIT 1"
+    var stmt: OpaquePointer?
+    guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+      throw RemindCoreError.operationFailed("Failed to query zone owner")
+    }
+    defer { sqlite3_finalize(stmt) }
+    guard sqlite3_step(stmt) == SQLITE_ROW,
+          let cStr = sqlite3_column_text(stmt, 0) else {
+      throw RemindCoreError.operationFailed("No zone owner found")
+    }
+    return String(cString: cStr)
+  }
+
+  private func reminderBinaryIdentifier(db: OpaquePointer, reminderPK: Int64) throws -> Data {
+    let sql = "SELECT ZIDENTIFIER FROM ZREMCDREMINDER WHERE Z_PK = ?"
+    var stmt: OpaquePointer?
+    guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+      throw RemindCoreError.operationFailed("Failed to query reminder identifier")
+    }
+    defer { sqlite3_finalize(stmt) }
+    sqlite3_bind_int64(stmt, 1, reminderPK)
+    guard sqlite3_step(stmt) == SQLITE_ROW else {
+      throw RemindCoreError.operationFailed("Reminder not found: \(reminderPK)")
+    }
+    let blobPtr = sqlite3_column_blob(stmt, 0)
+    let blobLen = sqlite3_column_bytes(stmt, 0)
+    guard let ptr = blobPtr, blobLen > 0 else {
+      throw RemindCoreError.operationFailed("No identifier blob for reminder \(reminderPK)")
+    }
+    return Data(bytes: ptr, count: Int(blobLen))
+  }
+}
+
+extension UUID {
+  var uuidData: Data {
+    let uuid = self.uuid
+    return Data([uuid.0, uuid.1, uuid.2, uuid.3, uuid.4, uuid.5, uuid.6, uuid.7,
+                 uuid.8, uuid.9, uuid.10, uuid.11, uuid.12, uuid.13, uuid.14, uuid.15])
   }
 }
