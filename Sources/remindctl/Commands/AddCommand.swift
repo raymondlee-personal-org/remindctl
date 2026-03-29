@@ -54,6 +54,12 @@ enum AddCommand {
               help: "Comma-separated tags",
               parsing: .singleValue
             ),
+            .make(
+              label: "assign",
+              names: [.long("assign")],
+              help: "Assign to person (prepends @Name: to title)",
+              parsing: .singleValue
+            ),
           ]
         )
       ),
@@ -78,8 +84,12 @@ enum AddCommand {
         if title?.isEmpty == true { title = nil }
       }
 
-      guard let title else {
+      guard var title else {
         throw RemindCoreError.operationFailed("Missing title.")
+      }
+
+      if let assignee = values.option("assign") {
+        title = "@\(assignee): \(title)"
       }
 
       let listName = values.option("list")
