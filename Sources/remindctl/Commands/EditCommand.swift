@@ -48,6 +48,12 @@ enum EditCommand {
               help: "Comma-separated tags",
               parsing: .singleValue
             ),
+            .make(
+              label: "assign",
+              names: [.long("assign")],
+              help: "Assign to person (prepends/replaces @Name: in title)",
+              parsing: .singleValue
+            ),
           ],
           flags: [
             .make(label: "clearDue", names: [.long("clear-due")], help: "Clear due date"),
@@ -136,6 +142,17 @@ enum EditCommand {
       let tagsValue = values.option("tags")
       let tags: [String]? = tagsValue.map { $0.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) } }
 
+      // Handle --assign: prepend/replace @Name: prefix on the title
+      var assignedTitle: String? = title
+      if let assignee = values.option("assign") {
+        let currentTitle = title ?? reminder.title
+        // Strip existing @Name: prefix if present
+        let stripped = currentTitle.replacingOccurrences(
+          of: #"^@[^:]+:\s*"#, with: "", options: .regularExpression
+        )
+        assignedTitle = "@\(assignee): \(stripped)"
+      }
+
       let completeFlag = values.flag("complete")
       let incompleteFlag = values.flag("incomplete")
       if completeFlag && incompleteFlag {
@@ -143,14 +160,14 @@ enum EditCommand {
       }
       let isCompleted: Bool? = completeFlag ? true : (incompleteFlag ? false : nil)
 
-      if title == nil && listName == nil && notes == nil && dueUpdate == nil && priority == nil
+      if assignedTitle == nil && listName == nil && notes == nil && dueUpdate == nil && priority == nil
         && isCompleted == nil && recurrenceUpdate == nil && alarmUpdate == nil && urlUpdate == nil && tags == nil
       {
         throw RemindCoreError.operationFailed("No changes specified")
       }
 
       let update = ReminderUpdate(
-        title: title,
+        title: assignedTitle,
         notes: notes,
         dueDate: dueUpdate,
         priority: priority,
