@@ -223,7 +223,7 @@ public final class RemindersSQLiteStore: @unchecked Sendable {
     defer { sqlite3_close(db) }
 
     let sql = """
-      SELECT ZREMINDER2, ZASSIGNEE, ZCKASSIGNEEIDENTIFIER, ZASSIGNEDDATE
+      SELECT ZREMINDER1, ZASSIGNEE, ZCKASSIGNEEIDENTIFIER, ZASSIGNEDDATE
       FROM ZREMCDOBJECT
       WHERE Z_ENT = 21
       """
@@ -262,10 +262,16 @@ public final class RemindersSQLiteStore: @unchecked Sendable {
     defer { sqlite3_close(db) }
 
     // Try known columns — the schema may vary across macOS versions.
-    // We need Z_PK and some identifier; display name may be ZNAME, ZDISPLAYNAME, or ZFULLNAME.
+    // Names stored in ZFIRSTNAME/ZLASTNAME, fallback to ZNAME/ZDISPLAYNAME.
     let sql = """
       SELECT Z_PK, ZCKIDENTIFIER,
-             COALESCE(ZNAME, ZDISPLAYNAME, ZFULLNAME, NULL)
+             COALESCE(
+               CASE WHEN ZFIRSTNAME IS NOT NULL AND ZLASTNAME IS NOT NULL
+                    THEN ZFIRSTNAME || ' ' || ZLASTNAME
+                    ELSE COALESCE(ZFIRSTNAME, ZLASTNAME, ZNAME, ZDISPLAYNAME, NULL)
+               END,
+               NULL
+             )
       FROM ZREMCDOBJECT
       WHERE Z_ENT = 36
       """
@@ -382,7 +388,7 @@ public final class RemindersSQLiteStore: @unchecked Sendable {
     let sql = """
       INSERT INTO ZREMCDOBJECT (
         Z_PK, Z_ENT, Z_OPT, ZACCOUNT,
-        ZASSIGNEE, ZREMINDER2,
+        ZASSIGNEE, ZREMINDER1,
         ZCKASSIGNEEIDENTIFIER, ZASSIGNEDDATE,
         ZCKDIRTYFLAGS
       ) VALUES (?, 21, 1, 1, ?, ?, ?, ?, 1)
@@ -494,7 +500,7 @@ public final class RemindersSQLiteStore: @unchecked Sendable {
     defer { sqlite3_close(db) }
 
     // Join assignments with sharees and reminders to get displayable names
-    // Assignment: Z_ENT=21, ZREMINDER2=reminder Z_PK, ZASSIGNEE=sharee Z_PK
+    // Assignment: Z_ENT=21, ZREMINDER1=reminder Z_PK, ZASSIGNEE=sharee Z_PK
     // We need reminder's ZDACALENDARITEMUNIQUEIDENTIFIER and sharee's display name
 
     let allSharees = try sharees()
@@ -504,9 +510,9 @@ public final class RemindersSQLiteStore: @unchecked Sendable {
 
     // Get assignments with reminder calendar IDs
     let sql = """
-      SELECT a.ZASSIGNEE, a.ZREMINDER2, a.ZCKASSIGNEEIDENTIFIER, r.ZDACALENDARITEMUNIQUEIDENTIFIER
+      SELECT a.ZASSIGNEE, a.ZREMINDER1, a.ZCKASSIGNEEIDENTIFIER, r.ZDACALENDARITEMUNIQUEIDENTIFIER
       FROM ZREMCDOBJECT a
-      JOIN ZREMCDREMINDER r ON r.Z_PK = a.ZREMINDER2
+      JOIN ZREMCDREMINDER r ON r.Z_PK = a.ZREMINDER1
       WHERE a.Z_ENT = 21
       """
 
