@@ -17,7 +17,7 @@ struct HelpPrinter {
   static func renderRoot(version: String, rootName: String, commands: [CommandSpec]) -> [String] {
     var lines: [String] = []
     lines.append("\(rootName) \(version)")
-    lines.append("Manage Apple Reminders from the terminal")
+    lines.append("Manage Apple Reminders from the terminal (fork: +assign, +url, +alarm, +repeat, +tags)")
     lines.append("")
     lines.append("Usage:")
     lines.append("  \(rootName) [command] [options]")

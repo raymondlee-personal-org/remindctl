@@ -22,7 +22,7 @@ struct CommandRouter {
     ]
     let descriptor = CommandDescriptor(
       name: rootName,
-      abstract: "Manage Apple Reminders from the terminal",
+      abstract: "Manage Apple Reminders from the terminal (fork: +assign, +url, +alarm, +repeat, +tags)",
       discussion: nil,
       signature: CommandSignature(),
       subcommands: specs.map { $0.descriptor },
