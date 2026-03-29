@@ -65,8 +65,11 @@ enum AddCommand {
       ),
       usageExamples: [
         "remindctl add \"Buy milk\"",
-        "remindctl add --title \"Call mom\" --list Personal --due tomorrow",
-        "remindctl add \"Review docs\" --priority high",
+        "remindctl add \"Call mom\" --list Personal --due tomorrow",
+        "remindctl add \"Review docs\" --priority high --url https://docs.google.com/...",
+        "remindctl add \"Pay electric bill\" --list \"Familee reminder\" --assign Raymond --due 2026-04-15",
+        "remindctl add \"Team standup\" --repeat daily --alarm \"9:00 AM\"",
+        "remindctl add \"Grocery run\" --tags errands,weekend",
       ]
     ) { values, runtime in
       let titleOption = values.option("title")

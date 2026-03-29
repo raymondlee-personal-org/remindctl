@@ -63,7 +63,9 @@ enum EditCommand {
         "remindctl edit 1 --title \"New title\"",
         "remindctl edit 4A83 --due tomorrow",
         "remindctl edit 2 --priority high --notes \"Call before noon\"",
-        "remindctl edit 3 --clear-due",
+        "remindctl edit 3 --url https://drive.google.com/...",
+        "remindctl edit 1 --repeat weekly --alarm \"9:00 AM\"",
+        "remindctl edit 2 --clear-alarm --clear-repeat",
       ]
     ) { values, runtime in
       guard let input = values.argument(0) else {
