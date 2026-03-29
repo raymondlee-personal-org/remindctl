@@ -43,6 +43,23 @@ public struct ReminderList: Identifiable, Codable, Sendable, Equatable {
   }
 }
 
+public enum RecurrenceFrequency: String, Codable, CaseIterable, Sendable {
+  case daily
+  case weekly
+  case monthly
+  case yearly
+}
+
+public struct RecurrenceRule: Codable, Sendable, Equatable {
+  public let frequency: RecurrenceFrequency
+  public let interval: Int
+
+  public init(frequency: RecurrenceFrequency, interval: Int = 1) {
+    self.frequency = frequency
+    self.interval = interval
+  }
+}
+
 public struct ReminderItem: Identifiable, Codable, Sendable, Equatable {
   public let id: String
   public let title: String
@@ -53,6 +70,12 @@ public struct ReminderItem: Identifiable, Codable, Sendable, Equatable {
   public let dueDate: Date?
   public let listID: String
   public let listName: String
+  public let creationDate: Date?
+  public let recurrenceRule: RecurrenceRule?
+  public let alarmDate: Date?
+  public let parentID: String?
+  public let tags: [String]
+  public let url: String?
 
   public init(
     id: String,
@@ -63,7 +86,13 @@ public struct ReminderItem: Identifiable, Codable, Sendable, Equatable {
     priority: ReminderPriority,
     dueDate: Date?,
     listID: String,
-    listName: String
+    listName: String,
+    creationDate: Date? = nil,
+    recurrenceRule: RecurrenceRule? = nil,
+    alarmDate: Date? = nil,
+    parentID: String? = nil,
+    tags: [String] = [],
+    url: String? = nil
   ) {
     self.id = id
     self.title = title
@@ -74,6 +103,12 @@ public struct ReminderItem: Identifiable, Codable, Sendable, Equatable {
     self.dueDate = dueDate
     self.listID = listID
     self.listName = listName
+    self.creationDate = creationDate
+    self.recurrenceRule = recurrenceRule
+    self.alarmDate = alarmDate
+    self.parentID = parentID
+    self.tags = tags
+    self.url = url
   }
 }
 
