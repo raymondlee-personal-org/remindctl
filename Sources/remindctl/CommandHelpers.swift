@@ -23,4 +23,13 @@ enum CommandHelpers {
     }
     return date
   }
+
+  static func parseRecurrence(_ value: String) throws -> RecurrenceRule {
+    guard let freq = RecurrenceFrequency(rawValue: value.lowercased()) else {
+      throw RemindCoreError.operationFailed(
+        "Invalid recurrence: \"\(value)\" (use daily|weekly|monthly|yearly)"
+      )
+    }
+    return RecurrenceRule(frequency: freq)
+  }
 }

@@ -24,6 +24,36 @@ enum AddCommand {
               help: "none|low|medium|high",
               parsing: .singleValue
             ),
+            .make(
+              label: "repeat",
+              names: [.long("repeat")],
+              help: "daily|weekly|monthly|yearly",
+              parsing: .singleValue
+            ),
+            .make(
+              label: "alarm",
+              names: [.long("alarm")],
+              help: "Alarm date/time",
+              parsing: .singleValue
+            ),
+            .make(
+              label: "url",
+              names: [.long("url")],
+              help: "URL to attach",
+              parsing: .singleValue
+            ),
+            .make(
+              label: "parent",
+              names: [.long("parent")],
+              help: "Parent reminder ID",
+              parsing: .singleValue
+            ),
+            .make(
+              label: "tags",
+              names: [.long("tags")],
+              help: "Comma-separated tags",
+              parsing: .singleValue
+            ),
           ]
         )
       ),
@@ -60,6 +90,16 @@ enum AddCommand {
       let dueDate = try dueValue.map(CommandHelpers.parseDueDate)
       let priority = try priorityValue.map(CommandHelpers.parsePriority) ?? .none
 
+      let repeatValue = values.option("repeat")
+      let alarmValue = values.option("alarm")
+      let urlValue = values.option("url")
+      let parentValue = values.option("parent")
+      let tagsValue = values.option("tags")
+
+      let recurrenceRule = try repeatValue.map(CommandHelpers.parseRecurrence)
+      let alarmDate = try alarmValue.map(CommandHelpers.parseDueDate)
+      let tags = tagsValue.map { $0.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) } } ?? []
+
       let store = RemindersStore()
       try await store.requestAccess()
 
@@ -73,7 +113,17 @@ enum AddCommand {
         throw RemindCoreError.operationFailed("No default list found. Specify --list.")
       }
 
-      let draft = ReminderDraft(title: title, notes: notes, dueDate: dueDate, priority: priority)
+      let draft = ReminderDraft(
+        title: title,
+        notes: notes,
+        dueDate: dueDate,
+        priority: priority,
+        recurrenceRule: recurrenceRule,
+        alarmDate: alarmDate,
+        url: urlValue,
+        parentID: parentValue,
+        tags: tags
+      )
       let reminder = try await store.createReminder(draft, listName: targetList)
       OutputRenderer.printReminder(reminder, format: runtime.outputFormat)
     }

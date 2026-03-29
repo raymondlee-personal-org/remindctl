@@ -24,9 +24,36 @@ enum EditCommand {
               help: "none|low|medium|high",
               parsing: .singleValue
             ),
+            .make(
+              label: "repeat",
+              names: [.long("repeat")],
+              help: "daily|weekly|monthly|yearly",
+              parsing: .singleValue
+            ),
+            .make(
+              label: "alarm",
+              names: [.long("alarm")],
+              help: "Alarm date/time",
+              parsing: .singleValue
+            ),
+            .make(
+              label: "url",
+              names: [.long("url")],
+              help: "URL to attach",
+              parsing: .singleValue
+            ),
+            .make(
+              label: "tags",
+              names: [.long("tags")],
+              help: "Comma-separated tags",
+              parsing: .singleValue
+            ),
           ],
           flags: [
             .make(label: "clearDue", names: [.long("clear-due")], help: "Clear due date"),
+            .make(label: "clearAlarm", names: [.long("clear-alarm")], help: "Clear alarm"),
+            .make(label: "clearRepeat", names: [.long("clear-repeat")], help: "Clear recurrence"),
+            .make(label: "clearUrl", names: [.long("clear-url")], help: "Clear URL"),
             .make(label: "complete", names: [.long("complete")], help: "Mark completed"),
             .make(label: "incomplete", names: [.long("incomplete")], help: "Mark incomplete"),
           ]
@@ -71,6 +98,42 @@ enum EditCommand {
         priority = try CommandHelpers.parsePriority(priorityValue)
       }
 
+      var recurrenceUpdate: RecurrenceRule??
+      if let repeatValue = values.option("repeat") {
+        recurrenceUpdate = try CommandHelpers.parseRecurrence(repeatValue)
+      }
+      if values.flag("clearRepeat") {
+        if recurrenceUpdate != nil {
+          throw RemindCoreError.operationFailed("Use either --repeat or --clear-repeat, not both")
+        }
+        recurrenceUpdate = .some(nil)
+      }
+
+      var alarmUpdate: Date??
+      if let alarmValue = values.option("alarm") {
+        alarmUpdate = try CommandHelpers.parseDueDate(alarmValue)
+      }
+      if values.flag("clearAlarm") {
+        if alarmUpdate != nil {
+          throw RemindCoreError.operationFailed("Use either --alarm or --clear-alarm, not both")
+        }
+        alarmUpdate = .some(nil)
+      }
+
+      var urlUpdate: String??
+      if let urlValue = values.option("url") {
+        urlUpdate = .some(urlValue)
+      }
+      if values.flag("clearUrl") {
+        if urlUpdate != nil {
+          throw RemindCoreError.operationFailed("Use either --url or --clear-url, not both")
+        }
+        urlUpdate = .some(nil)
+      }
+
+      let tagsValue = values.option("tags")
+      let tags: [String]? = tagsValue.map { $0.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) } }
+
       let completeFlag = values.flag("complete")
       let incompleteFlag = values.flag("incomplete")
       if completeFlag && incompleteFlag {
@@ -78,7 +141,9 @@ enum EditCommand {
       }
       let isCompleted: Bool? = completeFlag ? true : (incompleteFlag ? false : nil)
 
-      if title == nil && listName == nil && notes == nil && dueUpdate == nil && priority == nil && isCompleted == nil {
+      if title == nil && listName == nil && notes == nil && dueUpdate == nil && priority == nil
+        && isCompleted == nil && recurrenceUpdate == nil && alarmUpdate == nil && urlUpdate == nil && tags == nil
+      {
         throw RemindCoreError.operationFailed("No changes specified")
       }
 
@@ -88,7 +153,11 @@ enum EditCommand {
         dueDate: dueUpdate,
         priority: priority,
         listName: listName,
-        isCompleted: isCompleted
+        isCompleted: isCompleted,
+        recurrenceRule: recurrenceUpdate,
+        alarmDate: alarmUpdate,
+        url: urlUpdate,
+        tags: tags
       )
 
       let updated = try await store.updateReminder(id: reminder.id, update: update)

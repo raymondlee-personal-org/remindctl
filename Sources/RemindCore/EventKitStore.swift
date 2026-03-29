@@ -103,18 +103,9 @@ public actor RemindersStore {
     if let dueDate = draft.dueDate {
       reminder.dueDateComponents = calendarComponents(from: dueDate)
     }
+    applyDraftFields(to: reminder, draft: draft)
     try eventStore.save(reminder, commit: true)
-    return ReminderItem(
-      id: reminder.calendarItemIdentifier,
-      title: reminder.title ?? "",
-      notes: reminder.notes,
-      isCompleted: reminder.isCompleted,
-      completionDate: reminder.completionDate,
-      priority: ReminderPriority(eventKitValue: Int(reminder.priority)),
-      dueDate: date(from: reminder.dueDateComponents),
-      listID: reminder.calendar.calendarIdentifier,
-      listName: reminder.calendar.title
-    )
+    return item(from: reminder)
   }
 
   public func updateReminder(id: String, update: ReminderUpdate) async throws -> ReminderItem {
@@ -142,20 +133,10 @@ public actor RemindersStore {
     if let isCompleted = update.isCompleted {
       reminder.isCompleted = isCompleted
     }
+    applyUpdateFields(to: reminder, update: update)
 
     try eventStore.save(reminder, commit: true)
-
-    return ReminderItem(
-      id: reminder.calendarItemIdentifier,
-      title: reminder.title ?? "",
-      notes: reminder.notes,
-      isCompleted: reminder.isCompleted,
-      completionDate: reminder.completionDate,
-      priority: ReminderPriority(eventKitValue: Int(reminder.priority)),
-      dueDate: date(from: reminder.dueDateComponents),
-      listID: reminder.calendar.calendarIdentifier,
-      listName: reminder.calendar.title
-    )
+    return item(from: reminder)
   }
 
   public func completeReminders(ids: [String]) async throws -> [ReminderItem] {
@@ -164,19 +145,7 @@ public actor RemindersStore {
       let reminder = try reminder(withID: id)
       reminder.isCompleted = true
       try eventStore.save(reminder, commit: true)
-      updated.append(
-        ReminderItem(
-          id: reminder.calendarItemIdentifier,
-          title: reminder.title ?? "",
-          notes: reminder.notes,
-          isCompleted: reminder.isCompleted,
-          completionDate: reminder.completionDate,
-          priority: ReminderPriority(eventKitValue: Int(reminder.priority)),
-          dueDate: date(from: reminder.dueDateComponents),
-          listID: reminder.calendar.calendarIdentifier,
-          listName: reminder.calendar.title
-        )
-      )
+      updated.append(item(from: reminder))
     }
     return updated
   }
@@ -214,13 +183,19 @@ public actor RemindersStore {
       let dueDateComponents: DateComponents?
       let listID: String
       let listName: String
+      let creationDate: Date?
+      let recurrenceFrequency: Int?
+      let recurrenceInterval: Int?
+      let alarmDate: Date?
+      let url: String?
     }
 
     let reminderData = await withCheckedContinuation { (continuation: CheckedContinuation<[ReminderData], Never>) in
       let predicate = eventStore.predicateForReminders(in: calendars)
       eventStore.fetchReminders(matching: predicate) { reminders in
         let data = (reminders ?? []).map { reminder in
-          ReminderData(
+          let rule = reminder.recurrenceRules?.first
+          return ReminderData(
             id: reminder.calendarItemIdentifier,
             title: reminder.title ?? "",
             notes: reminder.notes,
@@ -229,7 +204,12 @@ public actor RemindersStore {
             priority: Int(reminder.priority),
             dueDateComponents: reminder.dueDateComponents,
             listID: reminder.calendar.calendarIdentifier,
-            listName: reminder.calendar.title
+            listName: reminder.calendar.title,
+            creationDate: reminder.creationDate,
+            recurrenceFrequency: rule.map { Int($0.frequency.rawValue) },
+            recurrenceInterval: rule.map { $0.interval },
+            alarmDate: reminder.alarms?.first?.absoluteDate,
+            url: reminder.url?.absoluteString
           )
         }
         continuation.resume(returning: data)
@@ -237,7 +217,20 @@ public actor RemindersStore {
     }
 
     return reminderData.map { data in
-      ReminderItem(
+      let recurrenceRule: RecurrenceRule? = {
+        guard let freqRaw = data.recurrenceFrequency, let interval = data.recurrenceInterval else { return nil }
+        let freq: RecurrenceFrequency
+        switch EKRecurrenceFrequency(rawValue: freqRaw) {
+        case .daily: freq = .daily
+        case .weekly: freq = .weekly
+        case .monthly: freq = .monthly
+        case .yearly: freq = .yearly
+        default: return nil
+        }
+        return RecurrenceRule(frequency: freq, interval: interval)
+      }()
+
+      return ReminderItem(
         id: data.id,
         title: data.title,
         notes: data.notes,
@@ -246,7 +239,13 @@ public actor RemindersStore {
         priority: ReminderPriority(eventKitValue: data.priority),
         dueDate: date(from: data.dueDateComponents),
         listID: data.listID,
-        listName: data.listName
+        listName: data.listName,
+        creationDate: data.creationDate,
+        recurrenceRule: recurrenceRule,
+        alarmDate: data.alarmDate,
+        parentID: nil,
+        tags: [],
+        url: data.url
       )
     }
   }
@@ -285,7 +284,82 @@ public actor RemindersStore {
       priority: ReminderPriority(eventKitValue: Int(reminder.priority)),
       dueDate: date(from: reminder.dueDateComponents),
       listID: reminder.calendar.calendarIdentifier,
-      listName: reminder.calendar.title
+      listName: reminder.calendar.title,
+      creationDate: reminder.creationDate,
+      recurrenceRule: recurrenceRule(from: reminder),
+      alarmDate: alarmDate(from: reminder),
+      parentID: nil,
+      tags: [],
+      url: reminder.url?.absoluteString
     )
+  }
+
+  private func recurrenceRule(from reminder: EKReminder) -> RecurrenceRule? {
+    guard let rule = reminder.recurrenceRules?.first else { return nil }
+    let frequency: RecurrenceFrequency
+    switch rule.frequency {
+    case .daily: frequency = .daily
+    case .weekly: frequency = .weekly
+    case .monthly: frequency = .monthly
+    case .yearly: frequency = .yearly
+    @unknown default: return nil
+    }
+    return RecurrenceRule(frequency: frequency, interval: rule.interval)
+  }
+
+  private func ekRecurrenceRule(from rule: RecurrenceRule) -> EKRecurrenceRule {
+    let freq: EKRecurrenceFrequency
+    switch rule.frequency {
+    case .daily: freq = .daily
+    case .weekly: freq = .weekly
+    case .monthly: freq = .monthly
+    case .yearly: freq = .yearly
+    }
+    return EKRecurrenceRule(
+      recurrenceWith: freq,
+      interval: rule.interval,
+      end: nil
+    )
+  }
+
+  private func alarmDate(from reminder: EKReminder) -> Date? {
+    reminder.alarms?.first?.absoluteDate
+  }
+
+  private func applyDraftFields(to reminder: EKReminder, draft: ReminderDraft) {
+    if let rule = draft.recurrenceRule {
+      reminder.recurrenceRules = [ekRecurrenceRule(from: rule)]
+    }
+    if let alarmDate = draft.alarmDate {
+      reminder.addAlarm(EKAlarm(absoluteDate: alarmDate))
+    }
+    if let urlString = draft.url, let url = URL(string: urlString) {
+      reminder.url = url
+    }
+  }
+
+  private func applyUpdateFields(to reminder: EKReminder, update: ReminderUpdate) {
+    if let recurrenceUpdate = update.recurrenceRule {
+      if let rule = recurrenceUpdate {
+        reminder.recurrenceRules = [ekRecurrenceRule(from: rule)]
+      } else {
+        reminder.recurrenceRules = nil
+      }
+    }
+    if let alarmUpdate = update.alarmDate {
+      if let alarms = reminder.alarms {
+        for alarm in alarms { reminder.removeAlarm(alarm) }
+      }
+      if let alarmDate = alarmUpdate {
+        reminder.addAlarm(EKAlarm(absoluteDate: alarmDate))
+      }
+    }
+    if let urlUpdate = update.url {
+      if let urlString = urlUpdate, let url = URL(string: urlString) {
+        reminder.url = url
+      } else {
+        reminder.url = nil
+      }
+    }
   }
 }

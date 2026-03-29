@@ -117,12 +117,32 @@ public struct ReminderDraft: Sendable {
   public let notes: String?
   public let dueDate: Date?
   public let priority: ReminderPriority
+  public let recurrenceRule: RecurrenceRule?
+  public let alarmDate: Date?
+  public let url: String?
+  public let parentID: String?
+  public let tags: [String]
 
-  public init(title: String, notes: String?, dueDate: Date?, priority: ReminderPriority) {
+  public init(
+    title: String,
+    notes: String?,
+    dueDate: Date?,
+    priority: ReminderPriority,
+    recurrenceRule: RecurrenceRule? = nil,
+    alarmDate: Date? = nil,
+    url: String? = nil,
+    parentID: String? = nil,
+    tags: [String] = []
+  ) {
     self.title = title
     self.notes = notes
     self.dueDate = dueDate
     self.priority = priority
+    self.recurrenceRule = recurrenceRule
+    self.alarmDate = alarmDate
+    self.url = url
+    self.parentID = parentID
+    self.tags = tags
   }
 }
 
@@ -133,6 +153,10 @@ public struct ReminderUpdate: Sendable {
   public let priority: ReminderPriority?
   public let listName: String?
   public let isCompleted: Bool?
+  public let recurrenceRule: RecurrenceRule??
+  public let alarmDate: Date??
+  public let url: String??
+  public let tags: [String]?
 
   public init(
     title: String? = nil,
@@ -140,7 +164,11 @@ public struct ReminderUpdate: Sendable {
     dueDate: Date?? = nil,
     priority: ReminderPriority? = nil,
     listName: String? = nil,
-    isCompleted: Bool? = nil
+    isCompleted: Bool? = nil,
+    recurrenceRule: RecurrenceRule?? = nil,
+    alarmDate: Date?? = nil,
+    url: String?? = nil,
+    tags: [String]? = nil
   ) {
     self.title = title
     self.notes = notes
@@ -148,5 +176,9 @@ public struct ReminderUpdate: Sendable {
     self.priority = priority
     self.listName = listName
     self.isCompleted = isCompleted
+    self.recurrenceRule = recurrenceRule
+    self.alarmDate = alarmDate
+    self.url = url
+    self.tags = tags
   }
 }

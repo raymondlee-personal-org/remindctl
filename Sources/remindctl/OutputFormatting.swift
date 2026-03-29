@@ -51,7 +51,21 @@ enum OutputRenderer {
     switch format {
     case .standard:
       let due = reminder.dueDate.map { DateParsing.formatDisplay($0) } ?? "no due date"
-      Swift.print("✓ \(reminder.title) [\(reminder.listName)] — \(due)")
+      var extras = ""
+      if let rule = reminder.recurrenceRule {
+        extras += " repeat=\(rule.frequency.rawValue)"
+        if rule.interval > 1 { extras += "(every \(rule.interval))" }
+      }
+      if let alarm = reminder.alarmDate {
+        extras += " alarm=\(DateParsing.formatDisplay(alarm))"
+      }
+      if let url = reminder.url {
+        extras += " url=\(url)"
+      }
+      if !reminder.tags.isEmpty {
+        extras += " tags=\(reminder.tags.joined(separator: ","))"
+      }
+      Swift.print("✓ \(reminder.title) [\(reminder.listName)] — \(due)\(extras)")
     case .plain:
       Swift.print(plainLine(for: reminder))
     case .json:
@@ -97,8 +111,16 @@ enum OutputRenderer {
     for (index, reminder) in sorted.enumerated() {
       let status = reminder.isCompleted ? "x" : " "
       let due = reminder.dueDate.map { DateParsing.formatDisplay($0) } ?? "no due date"
-      let priority = reminder.priority == .none ? "" : " priority=\(reminder.priority.rawValue)"
-      Swift.print("[\(index + 1)] [\(status)] \(reminder.title) [\(reminder.listName)] — \(due)\(priority)")
+      var extras = ""
+      if reminder.priority != .none { extras += " priority=\(reminder.priority.rawValue)" }
+      if let rule = reminder.recurrenceRule {
+        extras += " repeat=\(rule.frequency.rawValue)"
+        if rule.interval > 1 { extras += "(every \(rule.interval))" }
+      }
+      if let alarm = reminder.alarmDate { extras += " alarm=\(DateParsing.formatDisplay(alarm))" }
+      if let url = reminder.url { extras += " url=\(url)" }
+      if !reminder.tags.isEmpty { extras += " tags=\(reminder.tags.joined(separator: ","))" }
+      Swift.print("[\(index + 1)] [\(status)] \(reminder.title) [\(reminder.listName)] — \(due)\(extras)")
     }
   }
 
