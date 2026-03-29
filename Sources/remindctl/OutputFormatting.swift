@@ -65,6 +65,12 @@ enum OutputRenderer {
       if !reminder.tags.isEmpty {
         extras += " tags=\(reminder.tags.joined(separator: ","))"
       }
+      if let section = reminder.sectionName {
+        extras += " section=\(section)"
+      }
+      if let assignee = reminder.assigneeName {
+        extras += " assigned=\(assignee)"
+      }
       Swift.print("✓ \(reminder.title) [\(reminder.listName)] — \(due)\(extras)")
     case .plain:
       Swift.print(plainLine(for: reminder))
@@ -120,6 +126,8 @@ enum OutputRenderer {
       if let alarm = reminder.alarmDate { extras += " alarm=\(DateParsing.formatDisplay(alarm))" }
       if let url = reminder.url { extras += " url=\(url)" }
       if !reminder.tags.isEmpty { extras += " tags=\(reminder.tags.joined(separator: ","))" }
+      if let section = reminder.sectionName { extras += " section=\(section)" }
+      if let assignee = reminder.assigneeName { extras += " assigned=\(assignee)" }
       Swift.print("[\(index + 1)] [\(status)] \(reminder.title) [\(reminder.listName)] — \(due)\(extras)")
     }
   }
@@ -140,6 +148,8 @@ enum OutputRenderer {
       reminder.priority.rawValue,
       due,
       reminder.title,
+      reminder.sectionName ?? "",
+      reminder.assigneeName ?? "",
     ].joined(separator: "\t")
   }
 

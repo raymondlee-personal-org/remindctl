@@ -76,6 +76,8 @@ public struct ReminderItem: Identifiable, Codable, Sendable, Equatable {
   public let parentID: String?
   public let tags: [String]
   public let url: String?
+  public let sectionName: String?
+  public let assigneeName: String?
 
   public init(
     id: String,
@@ -92,7 +94,9 @@ public struct ReminderItem: Identifiable, Codable, Sendable, Equatable {
     alarmDate: Date? = nil,
     parentID: String? = nil,
     tags: [String] = [],
-    url: String? = nil
+    url: String? = nil,
+    sectionName: String? = nil,
+    assigneeName: String? = nil
   ) {
     self.id = id
     self.title = title
@@ -109,6 +113,8 @@ public struct ReminderItem: Identifiable, Codable, Sendable, Equatable {
     self.parentID = parentID
     self.tags = tags
     self.url = url
+    self.sectionName = sectionName
+    self.assigneeName = assigneeName
   }
 }
 

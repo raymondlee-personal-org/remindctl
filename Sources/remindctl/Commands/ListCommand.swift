@@ -81,7 +81,8 @@ enum ListCommand {
         }
 
         let reminders = try await store.reminders(in: name)
-        OutputRenderer.printReminders(reminders, format: runtime.outputFormat)
+        let enriched = SQLiteEnricher.enrich(reminders)
+        OutputRenderer.printReminders(enriched, format: runtime.outputFormat)
         return
       }
 

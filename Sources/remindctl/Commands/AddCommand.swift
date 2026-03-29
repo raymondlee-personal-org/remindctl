@@ -137,7 +137,27 @@ enum AddCommand {
         parentID: parentValue,
         tags: tags
       )
-      let reminder = try await store.createReminder(draft, listName: targetList)
+      var reminder = try await store.createReminder(draft, listName: targetList)
+
+      // Write real DB assignment if --assign was provided
+      if let assignee = values.option("assign") {
+        do {
+          let sqliteStore = try RemindersSQLiteStore()
+          if let sharee = try sqliteStore.findSharee(matching: assignee),
+            let reminderPK = try sqliteStore.reminderPK(forCalendarItemID: reminder.id)
+          {
+            try sqliteStore.writeAssignment(
+              reminderPK: reminderPK, shareePK: sharee.pk,
+              shareeCKIdentifier: sharee.ckIdentifier)
+            RemindersSQLiteStore.triggerSync()
+            // Re-enrich to show assignee in output
+            reminder = SQLiteEnricher.enrich([reminder]).first ?? reminder
+          }
+        } catch {
+          // Assignment write failed — the @Name: prefix in the title is still there as fallback
+        }
+      }
+
       OutputRenderer.printReminder(reminder, format: runtime.outputFormat)
     }
   }
